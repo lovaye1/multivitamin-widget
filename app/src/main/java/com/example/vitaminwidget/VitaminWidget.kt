@@ -6,6 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -23,6 +25,7 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.layout.*
 import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.glance.text.FontFamily
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -64,7 +67,7 @@ class VitaminWidget : GlanceAppWidget() {
             val opacityFraction = (100 - transparencyPercent) / 100f
 
             GlanceTheme {
-                WidgetContent(
+                NothingGlassWidgetContent(
                     context = context,
                     isTaken = isTaken,
                     opacity = opacityFraction,
@@ -75,7 +78,7 @@ class VitaminWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun WidgetContent(
+    private fun NothingGlassWidgetContent(
         context: Context,
         isTaken: Boolean,
         opacity: Float,
@@ -86,126 +89,200 @@ class VitaminWidget : GlanceAppWidget() {
         val isWide2x1 = size.width >= 110.dp && size.height < 110.dp
         val isTall1x2 = size.width < 110.dp && size.height >= 110.dp
 
-        val baseContainerColor = if (isTaken) {
-            GlanceTheme.colors.primaryContainer.getColor(context)
-        } else {
-            GlanceTheme.colors.errorContainer.getColor(context)
-        }
-        val bgColorWithAlpha = baseContainerColor.copy(alpha = opacity)
+        // Nothing OS 5 Smoked Charcoal Base blended with 16% of Device's Material You Dynamic Color
+        val deviceAccent = GlanceTheme.colors.primary.getColor(context)
+        val nothingSmokedBase = Color(0xFF121316)
+        val tintedDarkGlass = lerp(nothingSmokedBase, deviceAccent, 0.14f).copy(alpha = opacity)
 
-        val contentColor = if (isTaken) {
-            GlanceTheme.colors.onPrimaryContainer
+        // Inner pill surface (slightly lighter smoked layer)
+        val pillSurfaceAlpha = (opacity * 0.85f).coerceIn(0f, 1f)
+        val nothingCrimson = Color(0xFFD71921)
+        val statusAccent = if (isTaken) lerp(deviceAccent, Color.White, 0.25f) else nothingCrimson
+        val badgeBg = if (isTaken) {
+            deviceAccent.copy(alpha = (0.28f * opacity).coerceAtLeast(0.12f))
         } else {
-            GlanceTheme.colors.onErrorContainer
+            nothingCrimson.copy(alpha = (0.28f * opacity).coerceAtLeast(0.12f))
         }
 
-        // Uses actionRunCallback so taps are never blocked by Android's BroadcastReceiver queue
+        val primaryText = ColorProvider(Color(0xFFF5F5F7))
+        val secondaryText = ColorProvider(Color(0xFF9E9EA6))
+        val accentProvider = ColorProvider(statusAccent)
+
         val clickModifier = GlanceModifier.clickable(actionRunCallback<WidgetTapCallback>())
 
+        // Outer Smoked Glass Shell + 1dp Translucent Nothing Rim Highlight
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .cornerRadius(24.dp)
-                .background(ColorProvider(bgColorWithAlpha))
-                .then(clickModifier)
-                .padding(8.dp),
+                .cornerRadius(26.dp)
+                .background(ColorProvider(tintedDarkGlass))
+                .then(clickModifier),
             contentAlignment = Alignment.Center
         ) {
-            when {
-                isCompact1x1 -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = clickModifier
-                    ) {
-                        Text(
-                            text = if (isTaken) "💊✅" else "💊❗",
-                            style = TextStyle(fontSize = 22.sp),
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .background(ImageProvider(R.drawable.nothing_glass_border))
+                    .padding(if (isCompact1x1) 8.dp else 12.dp)
+                    .then(clickModifier),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    // 1x1 Compact Nothing Dot Matrix Tile
+                    isCompact1x1 -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = clickModifier
-                        )
-                        Text(
-                            text = if (isTaken) "Done" else "Take!",
-                            style = TextStyle(
-                                color = contentColor,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = clickModifier
-                        )
-                    }
-                }
-                isWide2x1 -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = clickModifier
-                    ) {
-                        Text(
-                            text = if (isTaken) "✅" else "💊",
-                            style = TextStyle(fontSize = 26.sp),
-                            modifier = clickModifier
-                        )
-                        Spacer(GlanceModifier.width(8.dp))
-                        Column(modifier = clickModifier) {
+                        ) {
+                            Box(
+                                modifier = GlanceModifier
+                                    .cornerRadius(14.dp)
+                                    .background(ColorProvider(badgeBg))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .then(clickModifier),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isTaken) "● OK" else "● RX",
+                                    style = TextStyle(
+                                        color = accentProvider,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    modifier = clickModifier
+                                )
+                            }
+                            Spacer(GlanceModifier.height(6.dp))
                             Text(
-                                text = "Multivitamin",
+                                text = if (isTaken) "TAKEN" else "TAKE",
                                 style = TextStyle(
-                                    color = contentColor,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
+                                    color = primaryText,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
                                 ),
-                                modifier = clickModifier
-                            )
-                            Text(
-                                text = if (isTaken) "Taken today" else "Not taken yet",
-                                style = TextStyle(color = contentColor, fontSize = 12.sp),
                                 modifier = clickModifier
                             )
                         }
                     }
-                }
-                else -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = clickModifier
-                    ) {
-                        Text(
-                            text = if (isTaken) "💊 ✅" else "💊 ⏰",
-                            style = TextStyle(fontSize = if (isTall1x2) 26.sp else 34.sp),
-                            modifier = clickModifier
-                        )
-                        Spacer(GlanceModifier.height(6.dp))
-                        Text(
-                            text = "Daily Vitamin",
-                            style = TextStyle(
-                                color = contentColor,
-                                fontSize = if (isTall1x2) 13.sp else 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            ),
-                            modifier = clickModifier
-                        )
-                        Spacer(GlanceModifier.height(2.dp))
-                        Text(
-                            text = if (isTaken) "Taken Today!" else "Tap 2x to Submit",
-                            style = TextStyle(
-                                color = contentColor,
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center
-                            ),
-                            modifier = clickModifier
-                        )
-                        if (!isTall1x2) {
-                            Spacer(GlanceModifier.height(4.dp))
+
+                    // 2x1 Horizontal Nothing Bar
+                    isWide2x1 -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = GlanceModifier.fillMaxWidth().then(clickModifier)
+                        ) {
+                            Box(
+                                modifier = GlanceModifier
+                                    .size(40.dp)
+                                    .cornerRadius(20.dp)
+                                    .background(ColorProvider(badgeBg))
+                                    .then(clickModifier),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isTaken) "✓" else "●",
+                                    style = TextStyle(
+                                        color = accentProvider,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    modifier = clickModifier
+                                )
+                            }
+                            Spacer(GlanceModifier.width(12.dp))
+                            Column(modifier = clickModifier) {
+                                Text(
+                                    text = "VITAMIN // 01",
+                                    style = TextStyle(
+                                        color = secondaryText,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    modifier = clickModifier
+                                )
+                                Text(
+                                    text = if (isTaken) "LOGGED TODAY" else "PENDING DOSE",
+                                    style = TextStyle(
+                                        color = primaryText,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    modifier = clickModifier
+                                )
+                            }
+                        }
+                    }
+
+                    // 1x2 Vertical or 2x2+ Full Nothing OS 5 Card
+                    else -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = GlanceModifier.fillMaxSize().then(clickModifier)
+                        ) {
                             Text(
-                                text = "1x: Calendar • 3x: Reset",
+                                text = "DAILY.VITAMIN",
                                 style = TextStyle(
-                                    color = contentColor,
+                                    color = secondaryText,
                                     fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
                                     textAlign = TextAlign.Center
                                 ),
                                 modifier = clickModifier
                             )
+                            Spacer(GlanceModifier.height(8.dp))
+                            Box(
+                                modifier = GlanceModifier
+                                    .cornerRadius(20.dp)
+                                    .background(ColorProvider(badgeBg))
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                                    .then(clickModifier),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isTaken) "● TAKEN" else "● NOT TAKEN",
+                                    style = TextStyle(
+                                        color = accentProvider,
+                                        fontSize = if (isTall1x2) 11.sp else 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    modifier = clickModifier
+                                )
+                            }
+                            Spacer(GlanceModifier.height(8.dp))
+                            Text(
+                                text = if (isTaken) "DOSE COMPLETE" else "2X TAP : LOG",
+                                style = TextStyle(
+                                    color = primaryText,
+                                    fontSize = if (isTall1x2) 11.sp else 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    textAlign = TextAlign.Center
+                                ),
+                                modifier = clickModifier
+                            )
+                            if (!isTall1x2) {
+                                Spacer(GlanceModifier.height(4.dp))
+                                Text(
+                                    text = "1X CAL  ·  3X RST",
+                                    style = TextStyle(
+                                        color = secondaryText,
+                                        fontSize = 9.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    modifier = clickModifier
+                                )
+                            }
                         }
                     }
                 }
@@ -228,9 +305,8 @@ class WidgetTapCallback : ActionCallback {
         parameters: ActionParameters
     ) {
         val appContext = context.applicationContext
-        val currentTap = tapCounter.incrementAndGet()
+        tapCounter.incrementAndGet()
 
-        // Immediately cancel any previous pending tap timer and return right away so Android doesn't block tap #2/#3
         debounceJob?.cancel()
         debounceJob = scope.launch {
             delay(MULTI_TAP_WINDOW_MS)
@@ -247,14 +323,14 @@ class WidgetTapCallback : ActionCallback {
                     VitaminRepository.setTakenToday(appContext, true)
                     VitaminWidget.forceRefresh(appContext)
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(appContext, "Multivitamin marked as TAKEN! 💊", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appContext, "DOSE LOGGED // TAKEN ●", Toast.LENGTH_SHORT).show()
                     }
                 }
                 else -> if (finalTaps >= 3) {
                     VitaminRepository.setTakenToday(appContext, false)
                     VitaminWidget.forceRefresh(appContext)
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(appContext, "Today's status RESET ↺", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appContext, "STATUS RESET // ↺", Toast.LENGTH_SHORT).show()
                     }
                 }
             }

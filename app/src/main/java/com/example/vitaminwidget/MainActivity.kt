@@ -42,7 +42,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
-            // Nothing OS 5 Dark Translucent Theme infused with Device Dynamic Accent
             val dynamicBase = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 dynamicDarkColorScheme(context)
             } else {
@@ -110,7 +109,6 @@ fun VitaminCalendarScreen() {
             color = Color(0xFFF5F5F7)
         )
 
-        // Status Card (Nothing OS Smoked Glass)
         Card(
             shape = RoundedCornerShape(24.dp),
             border = BorderStroke(1.dp, glassBorder),
@@ -126,7 +124,7 @@ fun VitaminCalendarScreen() {
             ) {
                 Column {
                     Text(
-                        text = if (takenToday) "● DOSE LOGGED" else "● DOSE PENDING",
+                        text = if (takenToday) "[ DOSE LOGGED ]" else "[ DOSE PENDING ]",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -134,7 +132,7 @@ fun VitaminCalendarScreen() {
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "2X TAP: SUBMIT  ·  3X TAP: RESET",
+                        text = "2X TAP: SUBMIT  /  3X TAP: RESET",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         color = Color(0xFF9E9EA6)
@@ -161,7 +159,6 @@ fun VitaminCalendarScreen() {
             }
         }
 
-        // Nothing OS Dot-Matrix Style Calendar Card
         Card(
             shape = RoundedCornerShape(24.dp),
             border = BorderStroke(1.dp, glassBorder),
@@ -175,7 +172,7 @@ fun VitaminCalendarScreen() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                        Text("◀", fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("< PREV", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
                     }
                     Text(
                         text = "${currentMonth.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()} // ${currentMonth.year}",
@@ -185,7 +182,7 @@ fun VitaminCalendarScreen() {
                         color = Color.White
                     )
                     TextButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
-                        Text("▶", fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("NEXT >", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
                     }
                 }
 
@@ -256,9 +253,9 @@ fun VitaminCalendarScreen() {
                                 )
                                 Text(
                                     text = when {
-                                        isTaken -> "●"
-                                        isPastMissed -> "×"
-                                        else -> "·"
+                                        isTaken -> "+"
+                                        isPastMissed -> "-"
+                                        else -> "--"
                                     },
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 9.sp,
@@ -275,7 +272,7 @@ fun VitaminCalendarScreen() {
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "● LOGGED   ·   × MISSED DOSE",
+                    text = "[ + ] LOGGED   /   [ - ] MISSED DOSE",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
                     color = Color(0xFF9E9EA6),
@@ -284,7 +281,6 @@ fun VitaminCalendarScreen() {
             }
         }
 
-        // Smoked Glass Transparency Slider with Live Preview Bar
         Card(
             shape = RoundedCornerShape(24.dp),
             border = BorderStroke(1.dp, glassBorder),

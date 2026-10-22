@@ -89,13 +89,10 @@ class VitaminWidget : GlanceAppWidget() {
         val isWide2x1 = size.width >= 110.dp && size.height < 110.dp
         val isTall1x2 = size.width < 110.dp && size.height >= 110.dp
 
-        // Nothing OS 5 Smoked Charcoal Base blended with 16% of Device's Material You Dynamic Color
         val deviceAccent = GlanceTheme.colors.primary.getColor(context)
         val nothingSmokedBase = Color(0xFF121316)
         val tintedDarkGlass = lerp(nothingSmokedBase, deviceAccent, 0.14f).copy(alpha = opacity)
 
-        // Inner pill surface (slightly lighter smoked layer)
-        val pillSurfaceAlpha = (opacity * 0.85f).coerceIn(0f, 1f)
         val nothingCrimson = Color(0xFFD71921)
         val statusAccent = if (isTaken) lerp(deviceAccent, Color.White, 0.25f) else nothingCrimson
         val badgeBg = if (isTaken) {
@@ -110,7 +107,6 @@ class VitaminWidget : GlanceAppWidget() {
 
         val clickModifier = GlanceModifier.clickable(actionRunCallback<WidgetTapCallback>())
 
-        // Outer Smoked Glass Shell + 1dp Translucent Nothing Rim Highlight
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -128,7 +124,7 @@ class VitaminWidget : GlanceAppWidget() {
                 contentAlignment = Alignment.Center
             ) {
                 when {
-                    // 1x1 Compact Nothing Dot Matrix Tile
+                    // 1x1 Compact Tile
                     isCompact1x1 -> {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -144,7 +140,7 @@ class VitaminWidget : GlanceAppWidget() {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (isTaken) "● OK" else "● RX",
+                                    text = if (isTaken) "[OK]" else "[RX]",
                                     style = TextStyle(
                                         color = accentProvider,
                                         fontSize = 11.sp,
@@ -168,7 +164,7 @@ class VitaminWidget : GlanceAppWidget() {
                         }
                     }
 
-                    // 2x1 Horizontal Nothing Bar
+                    // 2x1 Horizontal Bar
                     isWide2x1 -> {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -184,10 +180,10 @@ class VitaminWidget : GlanceAppWidget() {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (isTaken) "✓" else "●",
+                                    text = if (isTaken) "OK" else "RX",
                                     style = TextStyle(
                                         color = accentProvider,
-                                        fontSize = 18.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace
                                     ),
@@ -220,7 +216,7 @@ class VitaminWidget : GlanceAppWidget() {
                         }
                     }
 
-                    // 1x2 Vertical or 2x2+ Full Nothing OS 5 Card
+                    // 1x2 Vertical or 2x2+ Full Card
                     else -> {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -248,10 +244,10 @@ class VitaminWidget : GlanceAppWidget() {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (isTaken) "● TAKEN" else "● NOT TAKEN",
+                                    text = if (isTaken) "[ TAKEN ]" else "[ NOT TAKEN ]",
                                     style = TextStyle(
                                         color = accentProvider,
-                                        fontSize = if (isTall1x2) 11.sp else 13.sp,
+                                        fontSize = if (isTall1x2) 10.sp else 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace
                                     ),
@@ -273,7 +269,7 @@ class VitaminWidget : GlanceAppWidget() {
                             if (!isTall1x2) {
                                 Spacer(GlanceModifier.height(4.dp))
                                 Text(
-                                    text = "1X CAL  ·  3X RST",
+                                    text = "1X CAL  /  3X RST",
                                     style = TextStyle(
                                         color = secondaryText,
                                         fontSize = 9.sp,
@@ -323,14 +319,14 @@ class WidgetTapCallback : ActionCallback {
                     VitaminRepository.setTakenToday(appContext, true)
                     VitaminWidget.forceRefresh(appContext)
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(appContext, "DOSE LOGGED // TAKEN ●", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appContext, "DOSE LOGGED // TAKEN", Toast.LENGTH_SHORT).show()
                     }
                 }
                 else -> if (finalTaps >= 3) {
                     VitaminRepository.setTakenToday(appContext, false)
                     VitaminWidget.forceRefresh(appContext)
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(appContext, "STATUS RESET // ↺", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appContext, "STATUS RESET // CLEARED", Toast.LENGTH_SHORT).show()
                     }
                 }
             }

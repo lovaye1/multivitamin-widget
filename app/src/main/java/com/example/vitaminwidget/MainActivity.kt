@@ -2,11 +2,13 @@ package com.example.vitaminwidget
 
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -40,6 +42,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         MidnightRefreshReceiver.scheduleNextMidnight(this)
 
+        // Enable real Android 12+ hardware window background blur
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes.blurBehindRadius = 48
+        }
+
         setContent {
             val context = LocalContext.current
             val dynamicBase = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -58,7 +66,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = nothingScheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
                 ) {
                     VitaminCalendarScreen()
                 }
@@ -75,6 +83,7 @@ fun VitaminCalendarScreen() {
 
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var takenToday by remember { mutableStateOf(VitaminRepository.isTakenToday(context)) }
+    var calendarRevision by remember { mutableIntStateOf(0) }
     var transparencyPercent by remember {
         mutableFloatStateOf(VitaminRepository.getTransparencyPercent(context).toFloat())
     }
@@ -89,6 +98,7 @@ fun VitaminCalendarScreen() {
             if (event == Lifecycle.Event.ON_RESUME) {
                 takenToday = VitaminRepository.isTakenToday(context)
                 transparencyPercent = VitaminRepository.getTransparencyPercent(context).toFloat()
+                calendarRevision++
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -142,6 +152,7 @@ fun VitaminCalendarScreen() {
                     onClick = {
                         takenToday = !takenToday
                         VitaminRepository.setTakenToday(context, takenToday)
+                        calendarRevision++
                         scope.launch { VitaminWidget.forceRefresh(context) }
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -210,61 +221,73 @@ fun VitaminCalendarScreen() {
                 val daysInMonth = currentMonth.lengthOfMonth()
                 val today = LocalDate.now()
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(7),
-                    modifier = Modifier.height(236.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(emptyLeadingDays) {
-                        Box(modifier = Modifier.size(36.dp))
-                    }
-                    items(daysInMonth) { index ->
-                        val date = currentMonth.atDay(index + 1)
-                        val isTaken = if (date == today) takenToday else VitaminRepository.isTakenOn(context, date)
-                        val isPastMissed = date.isBefore(today) && !isTaken
-
-                        val cellBg = when {
-                            isTaken -> deviceAccent.copy(alpha = 0.24f)
-                            isPastMissed -> nothingRed.copy(alpha = 0.22f)
-                            else -> Color(0xFF202228)
+                // Keyed on calendarRevision so tapping any date immediately recomposes the grid
+                key(calendarRevision, currentMonth) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(7),
+                        modifier = Modifier.height(236.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(emptyLeadingDays) {
+                            Box(modifier = Modifier.size(36.dp))
                         }
-                        val cellBorder = when {
-                            isTaken -> deviceAccent
-                            isPastMissed -> nothingRed.copy(alpha = 0.65f)
-                            else -> Color.Transparent
-                        }
+                        items(daysInMonth) { index ->
+                            val date = currentMonth.atDay(index + 1)
+                            val isFuture = date.isAfter(today)
+                            val isTaken = VitaminRepository.isTakenOn(context, date)
+                            val isPastMissed = date.isBefore(today) && !isTaken
 
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(cellBg)
-                                .border(1.dp, cellBorder, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${index + 1}",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = when {
-                                        isTaken -> "+"
-                                        isPastMissed -> "-"
-                                        else -> "--"
+                            val cellBg = when {
+                                isTaken -> deviceAccent.copy(alpha = 0.24f)
+                                isPastMissed -> nothingRed.copy(alpha = 0.22f)
+                                else -> Color(0xFF202228)
+                            }
+                            val cellBorder = when {
+                                isTaken -> deviceAccent
+                                isPastMissed -> nothingRed.copy(alpha = 0.65f)
+                                else -> Color.Transparent
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(cellBg)
+                                    .border(1.dp, cellBorder, CircleShape)
+                                    .clickable(enabled = !isFuture) {
+                                        val updated = VitaminRepository.toggleDate(context, date)
+                                        if (date == today) {
+                                            takenToday = updated
+                                            scope.launch { VitaminWidget.forceRefresh(context) }
+                                        }
+                                        calendarRevision++
                                     },
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.sp,
-                                    color = when {
-                                        isTaken -> deviceAccent
-                                        isPastMissed -> nothingRed
-                                        else -> Color(0xFF6C6E76)
-                                    }
-                                )
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "${index + 1}",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = when {
+                                            isTaken -> "+"
+                                            isPastMissed -> "-"
+                                            else -> "--"
+                                        },
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        color = when {
+                                            isTaken -> deviceAccent
+                                            isPastMissed -> nothingRed
+                                            else -> Color(0xFF6C6E76)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -272,9 +295,9 @@ fun VitaminCalendarScreen() {
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "[ + ] LOGGED   /   [ - ] MISSED DOSE",
+                    text = "TAP ANY DAY TO TOGGLE  /  [+] LOGGED  [-] MISSED",
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     color = Color(0xFF9E9EA6),
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
@@ -293,7 +316,7 @@ fun VitaminCalendarScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "SMOKED GLASS TRANSPARENCY",
+                        text = "FROSTED GLASS TRANSPARENCY",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                         color = Color.White,

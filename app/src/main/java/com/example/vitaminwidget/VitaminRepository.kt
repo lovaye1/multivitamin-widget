@@ -20,14 +20,23 @@ object VitaminRepository {
 
     fun isTakenToday(context: Context): Boolean = isTakenOn(context, LocalDate.now())
 
-    fun setTakenToday(context: Context, taken: Boolean) {
+    fun setTakenOn(context: Context, date: LocalDate, taken: Boolean) {
         val current = prefs(context).getStringSet(KEY_TAKEN_DATES, emptySet())?.toMutableSet() ?: mutableSetOf()
-        val today = todayString()
-        if (taken) current.add(today) else current.remove(today)
+        val dateStr = date.toString()
+        if (taken) current.add(dateStr) else current.remove(dateStr)
         prefs(context).edit().putStringSet(KEY_TAKEN_DATES, current).commit()
     }
 
-    // Default 22% transparency (78% opacity) matches Nothing OS 5 smoked dark glass
+    fun toggleDate(context: Context, date: LocalDate): Boolean {
+        val newState = !isTakenOn(context, date)
+        setTakenOn(context, date, newState)
+        return newState
+    }
+
+    fun setTakenToday(context: Context, taken: Boolean) {
+        setTakenOn(context, LocalDate.now(), taken)
+    }
+
     fun getTransparencyPercent(context: Context): Int {
         return prefs(context).getInt(KEY_ALPHA_PERCENT, 22)
     }

@@ -5,15 +5,19 @@ import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.glance.*
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionSendBroadcast
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.layout.*
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -23,18 +27,43 @@ import androidx.glance.unit.ColorProvider
 class VitaminWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
+    override val stateDefinition = PreferencesGlanceStateDefinition
+
+    companion object {
+        private val REFRESH_TICK_KEY = longPreferencesKey("refresh_tick")
+
+        // Invalidates Glance's internal state cache so the widget redraws immediately without resizing
+        suspend fun forceRefresh(context: Context) {
+            val manager = GlanceAppWidgetManager(context)
+            val glanceIds = manager.getGlanceIds(VitaminWidget::class.java)
+            val now = System.currentTimeMillis()
+            glanceIds.forEach { id ->
+                updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { prefs ->
+                    prefs.toMutablePreferences().apply {
+                        this[REFRESH_TICK_KEY] = now
+                    }
+                }
+                VitaminWidget().update(context, id)
+            }
+        }
+    }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val isTaken = VitaminRepository.isTakenToday(context)
-        val transparencyPercent = VitaminRepository.getTransparencyPercent(context)
-        val opacityFraction = (100 - transparencyPercent) / 100f
-
         provideContent {
+            // Reading currentState forces Glance to recompose whenever forceRefresh() updates the tick
+            val prefs = currentState<androidx.datastore.preferences.core.Preferences>()
+            val tick = prefs[REFRESH_TICK_KEY] ?: 0L
+
+            val isTaken = VitaminRepository.isTakenToday(context)
+            val transparencyPercent = VitaminRepository.getTransparencyPercent(context)
+            val opacityFraction = (100 - transparencyPercent) / 100f
+
             GlanceTheme {
                 WidgetContent(
                     context = context,
                     isTaken = isTaken,
-                    opacity = opacityFraction
+                    opacity = opacityFraction,
+                    tick = tick
                 )
             }
         }
@@ -44,7 +73,8 @@ class VitaminWidget : GlanceAppWidget() {
     private fun WidgetContent(
         context: Context,
         isTaken: Boolean,
-        opacity: Float
+        opacity: Float,
+        tick: Long
     ) {
         val size = LocalSize.current
         val isCompact1x1 = size.width < 110.dp && size.height < 110.dp

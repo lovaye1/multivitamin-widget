@@ -17,11 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.appwidget.updateAll
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -62,11 +64,24 @@ class MainActivity : ComponentActivity() {
 fun VitaminCalendarScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var takenToday by remember { mutableStateOf(VitaminRepository.isTakenToday(context)) }
     var transparencyPercent by remember {
         mutableFloatStateOf(VitaminRepository.getTransparencyPercent(context).toFloat())
+    }
+
+    // Automatically syncs calendar UI whenever you open the app after double/triple tapping the widget
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                takenToday = VitaminRepository.isTakenToday(context)
+                transparencyPercent = VitaminRepository.getTransparencyPercent(context).toFloat()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(
@@ -113,7 +128,7 @@ fun VitaminCalendarScreen() {
                     onClick = {
                         takenToday = !takenToday
                         VitaminRepository.setTakenToday(context, takenToday)
-                        scope.launch { VitaminWidget().updateAll(context) }
+                        scope.launch { VitaminWidget.forceRefresh(context) }
                     }
                 ) {
                     Text(if (takenToday) "Reset" else "Take Now")
@@ -248,7 +263,7 @@ fun VitaminCalendarScreen() {
                     onValueChange = { newValue ->
                         transparencyPercent = newValue
                         VitaminRepository.setTransparencyPercent(context, newValue.roundToInt())
-                        scope.launch { VitaminWidget().updateAll(context) }
+                        scope.launch { VitaminWidget.forceRefresh(context) }
                     },
                     valueRange = 0f..100f
                 )
